@@ -8,7 +8,7 @@
 <section class="card"><h2 style="font-size:1.1rem;margin-top:0">Record grades</h2><p class="hint">Say “Number seventeen, S,” “Number seven, eighteen,” or “Number nine, thirty.” You can also say “three out of five.”</p>
 <div class="row"><button id="listen">🎙 Start listening</button><button id="stop" class="secondary" disabled>Stop</button></div>
 <p id="status" aria-live="polite">Microphone not started.</p><p id="heard" aria-live="polite"></p><p id="notice" aria-live="polite"></p>
-<label for="spoken">Or type / use your phone keyboard's dictation</label><textarea id="spoken" rows="2" placeholder="Number twelve S, number six S plus"></textarea><div class="row" style="margin-top:8px"><button id="parse" class="secondary">Record spoken text</button></div>
+<label for="spoken">Or type / use your phone keyboard's dictation</label><textarea id="spoken" rows="2" enterkeyhint="done" placeholder="Number twelve S, number six S plus"></textarea><div class="row" style="margin-top:8px"><button id="parse" class="secondary">Record spoken text</button></div>
 <details class="manual"><summary>Enter or correct a grade manually</summary><div class="grid"><div><label for="student">Student #</label><input id="student" type="number" min="1" max="19" placeholder="1–19"></div><div id="gradebox"><label for="grade">Grade</label><select id="grade"><option>O</option><option>S+</option><option selected>S</option><option>S−</option><option>N</option><option value="custom">Score (enter below)</option></select><input id="pointsEntry" style="display:none;margin-top:6px" placeholder="18 or 3/5" inputmode="text"></div></div>
 <div class="row" style="margin-top:12px"><button id="manual">Save grade</button><button id="undo" class="secondary">Undo last entry</button></div></details>
 </section>
@@ -31,7 +31,9 @@ function process(raw){$('notice').textContent='';$('heard').textContent='Heard: 
 $('new').addEventListener('click',()=>{if(Object.keys(scores).length&&!confirm('Clear all grades? Make sure you've copied them to your paper book first.'))return;scores={};history=[];save();show=true;render();$('status').textContent='List cleared for next stack.'});
 $('grade').addEventListener('change',()=>{$('pointsEntry').style.display=$('grade').value==='custom'?'block':'none'});
 $('manual').addEventListener('click',()=>{const id=Number($('student').value),v=$('grade').value==='custom'?$('pointsEntry').value:$('grade').value;if(!put(id,v))$('notice').textContent='Enter a student number 1–19 and a valid grade.';else $('notice').textContent='';});
-$('parse').addEventListener('click',()=>{const saved=process($('spoken').value);if(saved){$('spoken').value='';$('spoken').blur();$('gradeList').scrollIntoView({behavior:'smooth',block:'start'});}});
+function submitSpoken(){const saved=process($('spoken').value);if(saved){$('spoken').value='';$('spoken').blur();$('gradeList').scrollIntoView({behavior:'smooth',block:'start'});}}
+$('parse').addEventListener('click',submitSpoken);
+$('spoken').addEventListener('keydown',e=>{if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();submitSpoken();}});
 $('undo').addEventListener('click',()=>{const h=history.pop();if(!h)return;if(h.prior===undefined)delete scores[h.id];else scores[h.id]=h.prior;save();render();$('status').textContent='Undid last entry for #'+h.id});
 
 $('copy').addEventListener('click',async()=>{const text=Array.from({length:19},(_,i)=>(i+1)+'\t'+(scores[i+1]||'')).join('\n');try{await navigator.clipboard.writeText(text);$('status').textContent='List copied.'}catch(e){$('notice').textContent='Copy unavailable. Select grades from the table instead.'}});
