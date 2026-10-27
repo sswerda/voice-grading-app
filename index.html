@@ -18,24 +18,50 @@ function key(){return 'quick-grade-list'}
 function save(){try{localStorage.setItem(KEY,JSON.stringify({key:key(),scores,studentCount}))}catch(e){$('notice').textContent='Local save unavailable: keep this page open or copy your results.'}}
 function load(){try{const x=JSON.parse(localStorage.getItem(KEY)||'{}');if(x.scores)scores=x.scores;else scores={};studentCount=Number.isInteger(x.studentCount)&&x.studentCount>=1&&x.studentCount<=40?x.studentCount:19;$('classSize').value=studentCount}catch(e){scores={}}history=[];render()}
 function render(){let n=Object.keys(scores).filter(k=>Number(k)<=studentCount).length;$('count').textContent=n+' / '+studentCount+' graded';$('summary').textContent=n+' graded · '+(studentCount-n)+' blank';$('results').style.display='block';const body=$('rows');body.replaceChildren();for(let i=1;i<=studentCount;i++){const tr=document.createElement('tr'),a=document.createElement('td'),b=document.createElement('td');a.textContent=String(i);const inp=document.createElement('input');inp.setAttribute('aria-label','Grade for student '+i);inp.value=scores[i]??'';inp.placeholder='—';inp.addEventListener('change',()=>{const v=inp.value.trim();if(!v)delete scores[i];else if(valid(v))scores[i]=v;else{$('notice').textContent='Invalid grade for student '+i;inp.value=scores[i]||'';return}save();render()});b.append(inp);tr.append(a,b);body.append(tr)}}
-function valid(v){v=norm(v);return ['O','S+','S','S-','N'].includes(v)||/^(?:\d{1,3})\s*\/\s*(?:\d{1,3})$/.test(v)&&Number(v.split('/')[0])<=Number(v.split('/')[1])&&Number(v.split('/')[1])>0||/^\d{1,4}$/.test(v)}
+function valid(v){v=norm(v);return ['O','S+','S','S-','N'].includes(v)||/^(?:\d{1,3})\s*\/\s*(?:\d{1,3})$/.test(v)&&Number(v.split('/')[0])<=Number(v.split('/')[1])&&Number(v.split('/')[1])>0||/^\d{1,4}(?:\.\d{1,2})?$/.test(v)}
 function put(id,val){if(id<1||id>studentCount||!valid(val))return false;history.push({id,prior:scores[id]});scores[id]=norm(val);save();render();$('status').textContent='Saved #'+id+': '+scores[id];return true}
-function normalizeGrade(t){t=t.toLowerCase().replace(/\b(?:um+|uh+|erm|hmm+|ah+|like|you know|let me see|let's see|hold on|okay|ok)\b[,.!? ]*/g,' ').replace(/\s+/g,' ').trim().replace(/\bplus\b/g,'+').replace(/\bminus\b/g,'-');let m=t.match(/(?:^|[\s,.:;])(s\s*[+-]?|o|n)(?=[\s,.:;!?]|$)/i);if(m)return m[1].replace(/\s/g,'').toUpperCase();let p=t.match(/\b(\d{1,3})\s*(?:out of|\/|of)\s*(\d{1,3})\b/);if(p)return p[1]+'/'+p[2];let raw=t.match(/(?:^|[\s,.:;])(\d{1,4})(?=[\s,.:;!?]|$)/);return raw?raw[1]:null}
+function normalizeGrade(t){t=t.toLowerCase().replace(/\b(?:um+|uh+|erm|hmm+|ah+|like|you know|let me see|let's see|hold on|okay|ok)\b[,.!? ]*/g,' ').replace(/\s+/g,' ').trim().replace(/\bplus\b/g,'+').replace(/\bminus\b/g,'-');let m=t.match(/(?:^|[\s,.:;])(s\s*[+-]?|o|n)(?=[\s,.:;!?]|$)/i);if(m)return m[1].replace(/\s/g,'').toUpperCase();let p=t.match(/\b(\d{1,3})\s*(?:out of|\/|of)\s*(\d{1,3})\b/);if(p)return p[1]+'/'+p[2];let raw=t.match(/(?:^|[\s,.:;])(\d{1,4}(?:\.\d{1,2})?)(?=[\s,.:;!?]|$)/);return raw?raw[1]:null}
 const words={zero:0,one:1,two:2,three:3,four:4,five:5,six:6,seven:7,eight:8,nine:9,ten:10,eleven:11,twelve:12,thirteen:13,fourteen:14,fifteen:15,sixteen:16,seventeen:17,eighteen:18,nineteen:19};
 const ordinals={first:1,second:2,third:3,fourth:4,fifth:5,sixth:6,seventh:7,eighth:8,ninth:9,tenth:10,eleventh:11,twelfth:12,thirteenth:13,fourteenth:14,fifteenth:15,sixteenth:16,seventeenth:17,eighteenth:18,nineteenth:19};
 function numericWords(t){return t.toLowerCase().replace(/\b(\d{1,2})(?:st|nd|rd|th)\b/g,'$1').replace(/\b[a-z]+\b/g,m=>Object.prototype.hasOwnProperty.call(words,m)?String(words[m]):Object.prototype.hasOwnProperty.call(ordinals,m)?String(ordinals[m]):m)}
-function process(raw){$('notice').textContent='';$('heard').textContent='Heard: '+raw;
-const text=numericWords(raw).replace(/[–—]/g,'-').replace(/\b(?:grade|number|student)\b/gi,m=>'|'+m);
-const parts=text.split('|').map(s=>s.trim()).filter(Boolean);let saved=0,missed=0;
-for(const part of parts){
- const m=part.match(/^(?:(?:grade|student|number)\s+)?(\d{1,2})\s*(?:[,.:;=\-]|\s+)?\s*(?:got\s+|is\s+|scored\s+|score\s+|grade\s+|a\s+)?\s*(.+)$/i);
- if(!m){missed++;continue}
- const id=Number(m[1]),value=normalizeGrade(m[2]);
- if(value&&put(id,value))saved++;else missed++;
+function process(raw){
+ $('notice').textContent='';$('heard').textContent='Heard: '+raw;
+ const text=numericWords(raw).replace(/[–—]/g,'-').replace(/\b(?:grade|number|student)\b/gi,m=>'|'+m);
+ const parts=text.split('|').map(s=>s.trim()).filter(Boolean);
+ let saved=0;const skipped=[];
+ for(const part of parts){
+  const m=part.match(/^(?:(?:grade|student|number)\s+)?(\d{1,4}(?:\.\d{1,2})?)(?:\s*[,.:;=\-]\s*|\s+(?:got\s+|is\s+|scored\s+|score\s+|grade\s+|a\s+)?)(.+)$/i);
+  let id,value;
+  if(m){
+   id=Number(m[1]);value=normalizeGrade(m[2]);
+  }else{
+   // iPhone dictation often turns "number 17, 9.5" into "number 179.5".
+   const joined=part.match(/^(?:(?:grade|student|number)\s+)?(\d{2,4}(?:\.\d{1,2})?)\s*[,.;!?]*$/i);
+   if(joined){
+    const full=joined[1],candidates=[];
+    for(let n=1;n<=2;n++){
+     const left=full.slice(0,n),right=full.slice(n);
+     if(!right||left.startsWith('0')||Number(left)>studentCount)continue;
+     if(!/^\d{1,2}(?:\.\d{1,2})?$/.test(right)||Number(right)>10)continue;
+     candidates.push({id:Number(left),grade:right});
+    }
+    // Prefer a 10-point grade to an unlikely zero on a different student.
+    if(candidates.length>1){
+     const positive=candidates.filter(c=>Number(c.grade)!==0);
+     if(positive.length===1)candidates.splice(0,candidates.length,...positive);
+    }
+    if(candidates.length===1){id=candidates[0].id;value=candidates[0].grade}
+   }
+  }
+  if(id>=1&&id<=studentCount&&value&&valid(value)){
+   if(put(id,value))saved++;else skipped.push(part);
+  }else skipped.push(part);
+ }
+ if(!saved)$('notice').textContent='No grades saved. Check Last dictation; say "number one, score five" if needed.';
+ else $('notice').textContent=saved+' grade(s) captured. Review the list for accuracy.';
+ if(skipped.length)$('notice').textContent+=' Not understood (not saved): '+skipped.join(' | ')+'.';
+ return saved;
 }
-if(!saved)$('notice').textContent='No grade saved. Check Last dictation below to see exactly what your phone typed.';
-else $('notice').textContent=saved+' grade(s) captured.'+(missed?' '+missed+' entry/entries not understood.':'')+' Review the list for accuracy.';
-return saved}
 
 $('classSize').addEventListener('change',()=>{const v=Number($('classSize').value);if(!Number.isInteger(v)||v<1||v>40){$('classSize').value=studentCount;$('notice').textContent='Enter a class size from 1 to 40.';return}studentCount=v;save();render();$('notice').textContent='Class size updated to '+v+'. Existing scores are preserved.'});
 $('new').addEventListener('click',()=>{if(Object.keys(scores).length&&!confirm('Clear all grades? Make sure you have copied them to your paper book first.'))return;scores={};history=[];save();show=true;render();$('status').textContent='List cleared for next stack.'});
